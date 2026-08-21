@@ -25,13 +25,18 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FindInPage
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.BrowserTab
+import com.example.data.model.EngineSelectionMode
 import com.example.data.model.EngineType
 import com.example.ui.theme.ChromiumPrimary
 import com.example.ui.theme.GeckoPrimary
@@ -74,6 +80,9 @@ fun BottomBrowserBar(
     onOpenDevTools: () -> Unit,
     onOpenEngineInspector: () -> Unit,
     onOpenAuthCloud: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenDownloads: () -> Unit,
+    onFindInPage: () -> Unit,
     onToggleDesktop: () -> Unit,
     onToggleReader: () -> Unit,
     modifier: Modifier = Modifier
@@ -127,7 +136,7 @@ fun BottomBrowserBar(
                     .clip(RoundedCornerShape(18.dp))
                     .background(SurfaceVariantDark)
                     .clickable { onToggleEngine() }
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
                     .testTag("quick_engine_toggle"),
                 contentAlignment = Alignment.Center
             ) {
@@ -140,11 +149,20 @@ fun BottomBrowserBar(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (activeTab.engineType == EngineType.CHROMIUM_BLINK) "Chromium" else "Gecko",
+                        text = if (activeTab.engineType == EngineType.CHROMIUM_BLINK) "Blink" else "Gecko",
                         color = if (activeTab.engineType == EngineType.CHROMIUM_BLINK) ChromiumPrimary else GeckoPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
+                    if (!activeTab.isEngineManuallyOverridden && activeTab.engineSelectionMode == EngineSelectionMode.AUTO_DETECT) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF00E5FF))
+                        )
+                    }
                 }
             }
 
@@ -211,7 +229,22 @@ fun BottomBrowserBar(
                     )
 
                     DropdownMenuItem(
-                        text = { Text("Engine Diagnostics & Inspector", color = TextPrimaryDark) },
+                        text = { Text("Settings & Sync Preferences", color = TextPrimaryDark, fontWeight = FontWeight.SemiBold) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = null,
+                                tint = ChromiumPrimary
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onOpenSettings()
+                        }
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text("Engine Diagnostics & Auto-Routing", color = TextPrimaryDark) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.AutoAwesome,
@@ -222,6 +255,38 @@ fun BottomBrowserBar(
                         onClick = {
                             showMenu = false
                             onOpenEngineInspector()
+                        }
+                    )
+
+                    if (activeTab.url != "about:home") {
+                        DropdownMenuItem(
+                            text = { Text("Find in Page", color = TextPrimaryDark) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.FindInPage,
+                                    contentDescription = null,
+                                    tint = TextSecondaryDark
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                onFindInPage()
+                            }
+                        )
+                    }
+
+                    DropdownMenuItem(
+                        text = { Text("Downloads Manager", color = TextPrimaryDark) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = null,
+                                tint = TextSecondaryDark
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onOpenDownloads()
                         }
                     )
 
@@ -241,10 +306,10 @@ fun BottomBrowserBar(
                     )
 
                     DropdownMenuItem(
-                        text = { Text("Firebase Cloud & Account", color = TextPrimaryDark) },
+                        text = { Text("Firebase Cloud Sync & Account", color = TextPrimaryDark) },
                         leadingIcon = {
                             Icon(
-                                Icons.Default.Cloud,
+                                Icons.Default.CloudSync,
                                 contentDescription = null,
                                 tint = Color(0xFFFFCA28)
                             )
@@ -287,3 +352,4 @@ fun BottomBrowserBar(
         }
     }
 }
+

@@ -10,6 +10,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
 class FirebaseAuthEngine(context: Context) {
+    companion object {
+        const val FIREBASE_PROJECT_ID = "com.aistudio.dualbrowser.cxgk"
+        const val FIREBASE_STORAGE_BUCKET = "com.aistudio.dualbrowser.cxgk.appspot.com"
+        const val FIRESTORE_SYNC_COLLECTION = "browser_user_data"
+    }
+
+    val firebaseProjectId: String = FIREBASE_PROJECT_ID
+
     private val prefs: SharedPreferences = context.getSharedPreferences("firebase_browser_auth", Context.MODE_PRIVATE)
 
     private val _currentUser = MutableStateFlow(loadPersistedUser())

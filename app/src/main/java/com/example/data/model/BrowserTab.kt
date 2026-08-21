@@ -12,6 +12,9 @@ data class BrowserTab(
     val canGoBack: Boolean = false,
     val canGoForward: Boolean = false,
     val engineType: EngineType = EngineType.CHROMIUM_BLINK,
+    val engineSelectionMode: EngineSelectionMode = EngineSelectionMode.AUTO_DETECT,
+    val isEngineManuallyOverridden: Boolean = false,
+    val engineDetectionReason: String = "Default Home Dashboard",
     val isDesktopMode: Boolean = false,
     val isIncognito: Boolean = false,
     val isReaderMode: Boolean = false,
@@ -25,3 +28,4 @@ enum class SecurityLevel {
     INSECURE,
     LOCAL_PAGE
 }
+

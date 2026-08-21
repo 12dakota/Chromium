@@ -21,9 +21,15 @@ class WebEngineManager(
 ) {
 
     @SuppressLint("SetJavaScriptEnabled")
-    fun configureWebView(webView: WebView, engineType: EngineType, isDesktop: Boolean = false) {
+    fun configureWebView(
+        webView: WebView,
+        engineType: EngineType,
+        isDesktop: Boolean = false,
+        javascriptEnabled: Boolean = true,
+        customUserAgent: String? = null
+    ) {
         val settings = webView.settings
-        settings.javaScriptEnabled = true
+        settings.javaScriptEnabled = javascriptEnabled
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
         settings.loadsImagesAutomatically = true
@@ -34,18 +40,27 @@ class WebEngineManager(
         settings.displayZoomControls = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
         settings.cacheMode = WebSettings.LOAD_DEFAULT
+        settings.allowFileAccess = false
+        settings.allowContentAccess = false
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             settings.safeBrowsingEnabled = true
         }
 
-        applyEngineCharacteristics(webView, engineType, isDesktop)
+        applyEngineCharacteristics(webView, engineType, isDesktop, customUserAgent)
         attachJavascriptBridges(webView)
     }
 
-    fun applyEngineCharacteristics(webView: WebView, engineType: EngineType, isDesktop: Boolean) {
+    fun applyEngineCharacteristics(
+        webView: WebView,
+        engineType: EngineType,
+        isDesktop: Boolean,
+        customUserAgent: String? = null
+    ) {
         val settings = webView.settings
-        val userAgent = if (isDesktop) {
+        val userAgent = if (!customUserAgent.isNullOrBlank()) {
+            customUserAgent
+        } else if (isDesktop) {
             engineType.getDesktopUserAgent()
         } else {
             engineType.defaultUserAgent
@@ -72,6 +87,22 @@ class WebEngineManager(
                 injectGeckoQuantumPolyfills(webView)
             }
         }
+    }
+
+    fun switchEngineAndReload(
+        webView: WebView,
+        newEngine: EngineType,
+        isDesktop: Boolean,
+        customUserAgent: String? = null
+    ) {
+        applyEngineCharacteristics(webView, newEngine, isDesktop, customUserAgent)
+        // Inject runtime marker immediately
+        if (newEngine == EngineType.CHROMIUM_BLINK) {
+            injectChromiumBlinkPolyfills(webView)
+        } else {
+            injectGeckoQuantumPolyfills(webView)
+        }
+        webView.reload()
     }
 
     private fun attachJavascriptBridges(webView: WebView) {
@@ -124,13 +155,18 @@ class WebEngineManager(
         }, "DualEngineBridge")
     }
 
-    private fun injectChromiumBlinkPolyfills(webView: WebView) {
+    fun injectChromiumBlinkPolyfills(webView: WebView) {
         val js = """
             (function() {
                 try {
-                    window.__DUAL_ENGINE__ = { name: "Chromium Blink Core", version: "126.0", jsEngine: "V8" };
+                    window.__DUAL_ENGINE__ = { name: "Chromium Blink Core", version: "126.0", jsEngine: "V8", mode: "Blink" };
                     if (!window.chrome) {
                         window.chrome = { runtime: {}, app: {}, csi: function(){ return {}; } };
+                    }
+                    // Remove Gecko style quirks if switching back to Blink
+                    const geckoStyle = document.getElementById('dual-gecko-quirks');
+                    if (geckoStyle && geckoStyle.parentNode) {
+                        geckoStyle.parentNode.removeChild(geckoStyle);
                     }
                 } catch(e){}
             })();
@@ -138,23 +174,26 @@ class WebEngineManager(
         webView.evaluateJavascript(js, null)
     }
 
-    private fun injectGeckoQuantumPolyfills(webView: WebView) {
+    fun injectGeckoQuantumPolyfills(webView: WebView) {
         val js = """
             (function() {
                 try {
-                    window.__DUAL_ENGINE__ = { name: "Mozilla Gecko Engine", version: "128.0", jsEngine: "SpiderMonkey" };
+                    window.__DUAL_ENGINE__ = { name: "Mozilla Gecko Engine", version: "128.0", jsEngine: "SpiderMonkey", mode: "Gecko" };
                     if (!window.InstallTrigger) {
                         window.InstallTrigger = {};
                     }
-                    // Inject CSS Quantum rendering quirks & font subpixel hints
-                    const style = document.createElement('style');
-                    style.id = 'dual-gecko-quirks';
-                    style.innerHTML = `
-                        * { -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
-                        ::-moz-selection { background: #FF7A00; color: #ffffff; }
-                    `;
-                    if (!document.getElementById('dual-gecko-quirks') && document.head) {
-                        document.head.appendChild(style);
+                    // Inject CSS Quantum rendering quirks & typography hints
+                    let style = document.getElementById('dual-gecko-quirks');
+                    if (!style) {
+                        style = document.createElement('style');
+                        style.id = 'dual-gecko-quirks';
+                        style.innerHTML = `
+                            * { -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+                            ::-moz-selection { background: #FF7A00; color: #ffffff; }
+                        `;
+                        if (document.head) {
+                            document.head.appendChild(style);
+                        }
                     }
                 } catch(e){}
             })();
@@ -168,7 +207,7 @@ class WebEngineManager(
                 try {
                     const nodes = [];
                     const all = document.querySelectorAll('body, header, nav, main, article, section, h1, h2, h3, p, a, button, img, input, footer');
-                    const limit = Math.min(all.length, 35);
+                    const limit = Math.min(all.length, 40);
                     for (let i = 0; i < limit; i++) {
                         const el = all[i];
                         nodes.push({
@@ -234,3 +273,4 @@ class WebEngineManager(
         }
     }
 }
+

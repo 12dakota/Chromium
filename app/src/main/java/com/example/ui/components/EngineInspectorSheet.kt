@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.BrowserTab
 import com.example.data.model.EngineDiagnostics
+import com.example.data.model.EngineSelectionMode
 import com.example.data.model.EngineType
 import com.example.ui.theme.ChromiumAccent
 import com.example.ui.theme.ChromiumPrimary
@@ -116,6 +117,53 @@ fun EngineInspectorSheet(
                 }
                 IconButton(onClick = onDismiss) {
                     Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextSecondaryDark)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Auto-Detect & Routing Banner
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF002233)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF00E5FF).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = Color(0xFF00E5FF),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (activeTab.isEngineManuallyOverridden) "Manual Override Mode" else "Auto-Detected Routing",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF00E5FF)
+                        )
+                        Text(
+                            text = activeTab.engineDetectionReason,
+                            fontSize = 11.sp,
+                            color = TextSecondaryDark,
+                            lineHeight = 14.sp
+                        )
+                    }
                 }
             }
 
@@ -360,3 +408,4 @@ fun FeatureCheckRow(name: String, enabled: Boolean) {
         )
     }
 }
+

@@ -6,6 +6,7 @@ import android.net.http.SslError
 import android.os.Build
 import android.webkit.ConsoleMessage
 import android.webkit.SslErrorHandler
+import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -49,9 +50,12 @@ import com.example.ui.components.AuthDialog
 import com.example.ui.components.BookmarksHistorySheet
 import com.example.ui.components.BottomBrowserBar
 import com.example.ui.components.DevToolsDialog
+import com.example.ui.components.DownloadsSheet
 import com.example.ui.components.EngineInspectorSheet
+import com.example.ui.components.FindInPageBar
 import com.example.ui.components.Omnibox
 import com.example.ui.components.ReaderView
+import com.example.ui.components.SettingsSheet
 import com.example.ui.components.SpeedDialHome
 import com.example.ui.components.TabManagerSheet
 import com.example.ui.theme.SurfaceDark
@@ -80,6 +84,9 @@ fun BrowserApp(
     val domNodes by viewModel.domNodes.collectAsStateWithLifecycle()
     val jsEvalResult by viewModel.jsEvalResult.collectAsStateWithLifecycle()
     val adBlockEnabled by viewModel.adBlockEnabled.collectAsStateWithLifecycle()
+    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
+    val isFindInPageVisible by viewModel.isFindInPageVisible.collectAsStateWithLifecycle()
+    val findQuery by viewModel.findQuery.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -88,6 +95,8 @@ fun BrowserApp(
     val tabSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val engineSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val bookmarksSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val downloadsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var currentWebView by remember { mutableStateOf<WebView?>(null) }
 
@@ -109,7 +118,10 @@ fun BrowserApp(
 
     // Back handling
     BackHandler(enabled = true) {
-        if (activeSheet != ActiveSheet.NONE) {
+        if (isFindInPageVisible) {
+            viewModel.hideFindInPage()
+            currentWebView?.clearMatches()
+        } else if (activeSheet != ActiveSheet.NONE) {
             viewModel.closeSheet()
         } else if (activeTab.isReaderMode) {
             viewModel.toggleReaderMode()
@@ -140,6 +152,26 @@ fun BrowserApp(
                     onOpenTabs = { viewModel.openSheet(ActiveSheet.TAB_MANAGER) },
                     onOpenDevTools = { viewModel.openSheet(ActiveSheet.DEV_TOOLS) }
                 )
+
+                if (isFindInPageVisible) {
+                    FindInPageBar(
+                        query = findQuery,
+                        onQueryChange = { q ->
+                            viewModel.setFindQuery(q)
+                            if (q.isNotBlank()) {
+                                currentWebView?.findAllAsync(q)
+                            } else {
+                                currentWebView?.clearMatches()
+                            }
+                        },
+                        onNext = { currentWebView?.findNext(true) },
+                        onPrevious = { currentWebView?.findNext(false) },
+                        onClose = {
+                            viewModel.hideFindInPage()
+                            currentWebView?.clearMatches()
+                        }
+                    )
+                }
             }
         },
         bottomBar = {
@@ -162,8 +194,7 @@ fun BrowserApp(
                 onToggleEngine = {
                     viewModel.toggleEngine()
                     currentWebView?.let {
-                        engineManager.applyEngineCharacteristics(it, viewModel.activeTab.engineType, viewModel.activeTab.isDesktopMode)
-                        it.reload()
+                        engineManager.switchEngineAndReload(it, viewModel.activeTab.engineType, viewModel.activeTab.isDesktopMode)
                     }
                 },
                 onToggleBookmark = { viewModel.toggleBookmark() },
@@ -171,6 +202,9 @@ fun BrowserApp(
                 onOpenDevTools = { viewModel.openSheet(ActiveSheet.DEV_TOOLS) },
                 onOpenEngineInspector = { viewModel.openSheet(ActiveSheet.ENGINE_INSPECTOR) },
                 onOpenAuthCloud = { viewModel.openSheet(ActiveSheet.AUTH_CLOUD) },
+                onOpenSettings = { viewModel.openSheet(ActiveSheet.SETTINGS) },
+                onOpenDownloads = { viewModel.openSheet(ActiveSheet.DOWNLOADS) },
+                onFindInPage = { viewModel.showFindInPage() },
                 onToggleDesktop = {
                     viewModel.toggleDesktopMode()
                     currentWebView?.let {
@@ -226,6 +260,15 @@ fun BrowserApp(
                     factory = { context ->
                         WebView(context).apply {
                             engineManager.configureWebView(this, activeTab.engineType, activeTab.isDesktopMode)
+
+                            setDownloadListener { url, userAgent, contentDisposition, mimetype, contentLength ->
+                                val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
+                                val sizeStr = if (contentLength > 0) {
+                                    val mb = contentLength / (1024.0 * 1024.0)
+                                    String.format("%.1f MB", mb)
+                                } else "1.2 MB"
+                                viewModel.addDownload(fileName, sizeStr, url)
+                            }
 
                             webChromeClient = object : WebChromeClient() {
                                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -345,8 +388,7 @@ fun BrowserApp(
                 onSetEngine = { engineType ->
                     viewModel.setEngine(engineType)
                     currentWebView?.let {
-                        engineManager.applyEngineCharacteristics(it, engineType, activeTab.isDesktopMode)
-                        it.reload()
+                        engineManager.switchEngineAndReload(it, engineType, activeTab.isDesktopMode)
                     }
                 },
                 onToggleDesktop = {
@@ -404,5 +446,25 @@ fun BrowserApp(
                 onDismiss = { viewModel.closeSheet() }
             )
         }
+
+        if (activeSheet == ActiveSheet.SETTINGS) {
+            SettingsSheet(
+                viewModel = viewModel,
+                sheetState = settingsSheetState,
+                onDismiss = { viewModel.closeSheet() },
+                onOpenAuthCloud = {
+                    viewModel.openSheet(ActiveSheet.AUTH_CLOUD)
+                }
+            )
+        }
+
+        if (activeSheet == ActiveSheet.DOWNLOADS) {
+            DownloadsSheet(
+                downloads = downloads,
+                sheetState = downloadsSheetState,
+                onDismiss = { viewModel.closeSheet() }
+            )
+        }
     }
 }
+
