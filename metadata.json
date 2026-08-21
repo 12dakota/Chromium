@@ -1,0 +1,8 @@
+{
+  "name": "DualEngine Browser",
+  "description": "Advanced dual-engine web browser featuring switchable Chromium Blink & Firefox Gecko rendering profiles, Firebase login engine, tab management, bookmarks, and developer tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
